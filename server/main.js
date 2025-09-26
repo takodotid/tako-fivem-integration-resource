@@ -24,11 +24,6 @@ const SERVER_ID = GetConvar("tako:server_id", "__default__");
 const BASE_URL = `https://tako.id/api/fivem-server/${SERVER_ID}`;
 const VALID_PLAYER_LICENSES = ["license", "license2"]; // DO NOT CHANGE UNLESS PERMISSIBLE
 
-if (SERVER_ID === "__default__") {
-    console.error("[TAKO] Error: 'tako_server_id' convar is not set. Please set it in your server configuration.");
-    StopResource(GetCurrentResourceName());
-}
-
 /**
  * Ping the Tako server to update playtime for every integrated player on this server.
  * @returns {Promise<void>} Response text from server, if any
@@ -107,7 +102,7 @@ async function connect(integrationToken, licenses) {
  * Ping interval
  * @type {NodeJS.Timeout | undefined}
  */
-let interval;
+let pingInterval;
 
 /**
  * Handle resource start event
@@ -115,8 +110,14 @@ let interval;
 AddEventHandler("onResourceStart", async (/** @type {string} */ resourceName) => {
     if (resourceName !== GetCurrentResourceName()) return;
 
-    console.log("[TAKO] Resource started, initiating ping sequence...");
-    interval = setInterval(ping, PING_INTERVAL);
+    if (SERVER_ID === "__default__") {
+        console.error("[TAKO] Error: 'tako:server_id' convar is not set. Please set it in your server configuration.");
+        StopResource(GetCurrentResourceName());
+        return;
+    }
+
+    console.log(`[TAKO] Resource started, configured server ID: "${SERVER_ID}", initiating ping sequence...`);
+    pingInterval = setInterval(ping, PING_INTERVAL);
     await ping();
 });
 
@@ -127,7 +128,7 @@ AddEventHandler("onResourceStop", (/** @type {string} */ resourceName) => {
     if (resourceName !== GetCurrentResourceName()) return;
 
     console.log("[TAKO] Resource stopped, terminating ping sequence...");
-    if (interval) clearInterval(interval);
+    if (pingInterval) clearInterval(pingInterval);
 });
 
 /**
