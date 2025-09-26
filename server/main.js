@@ -116,6 +116,10 @@ AddEventHandler("onResourceStart", async (/** @type {string} */ resourceName) =>
         return;
     }
 
+    if (GetCurrentResourceName() !== "tako") {
+        console.warn("[TAKO] Warning: Resource must be named 'tako' to function properly. Please rename the resource folder.");
+    }
+
     console.log(`[TAKO] Resource started, configured server ID: "${SERVER_ID}", initiating ping sequence...`);
     pingInterval = setInterval(ping, PING_INTERVAL);
     await ping();
