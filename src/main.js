@@ -287,7 +287,10 @@ class Tako {
      */
     async ping() {
         try {
-            this.#logger.info("Pinging server...");
+            // Clear previous timeout if any to avoid multiple pings
+            if (this.#nextPingTimeout) {
+                clearTimeout(this.#nextPingTimeout);
+            }
 
             const licensesList = [];
 
@@ -297,12 +300,14 @@ class Tako {
             }
 
             if (!licensesList.length) {
-                this.#logger.info("No players to ping");
+                this.#logger.info("No players to ping, retrying in 5 minutes...");
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
                 return;
             }
 
             if (this.#hooks.prePingHooks && !(await this.#hooks.prePingHooks())) {
-                this.#logger.info("Ping aborted due to prePingHooks.");
+                this.#logger.info("Ping aborted due to pre-ping hook, retrying in 5 minutes...");
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
                 return;
             }
 
@@ -319,7 +324,6 @@ class Tako {
             const result = await res.text();
 
             if (!res.ok) {
-                // Handle rate limit
                 if (res.status === 429) {
                     let retryAfter = 30 * 60; // Default to 30 minutes
 
@@ -340,30 +344,33 @@ class Tako {
 
                     this.#logger.warn(`Next ping will be attempted in ${retryAfter} seconds (${(retryAfter / 60).toFixed(2)} minutes).`);
                     this.#nextPingTimeout = setTimeout(this.ping.bind(this), retryAfter * 1000);
-                    return;
+                } else {
+                    this.#logger.error("Failed to ping server, retrying in 5 minutes:", result);
+                    this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
                 }
 
-                this.#logger.error("Failed to ping server:", result);
                 return;
             }
 
             this.#logger.info("Successfully pinged server");
             this.#pingErrorCount = 0;
+            this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 1000); // Ping again after 5 seconds
+            return;
         } catch (error) {
-            this.#logger.error("Error pinging server:", error);
             this.#pingErrorCount++;
 
             if (this.#pingErrorCount >= 3) {
                 this.#logger.error(
-                    "Too many consecutive ping errors. Stopping further ping attempts. Please check your server configuration and network connection, or contact Tako if the issue persists."
+                    "Too many consecutive ping errors. Retrying again in 30 minutes. Please check your server configuration and network connection, or contact Tako if the issue persists."
                 );
-
-                return;
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 30 * 60 * 1000); // Retry ping after 30 minutes
+            } else {
+                this.#logger.error("Error pinging server, retrying in 5 minutes:", error);
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
             }
-        }
 
-        await new Promise((resolve) => setTimeout(resolve, 10 * 1000)); // Wait 10 second before the next ping to avoid spamming the server
-        await this.ping(); // Ping again to check if there's more data to process or to set timeout for the next ping (if ratelimited by the server)
+            return;
+        }
     }
 
     /**
