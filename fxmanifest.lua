@@ -9,6 +9,6 @@ server_only 'yes'
 node_version '22'
 
 server_scripts {
-  'server/main.js',
-  'server/hooks.js'
+  'src/main.js',
+  'src/hooks.js'
 }
