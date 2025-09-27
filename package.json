@@ -1,0 +1,17 @@
+{
+    "name": "@takodotid/fivem-integration-resource",
+    "repository": "https://github.com/takodotid/tako-fivem-integration-resource",
+    "bugs": "https://github.com/takodotid/tako-fivem-integration-resource/issues",
+    "author": {
+        "name": "Tako Developer Team",
+        "email": "developer@tako.id"
+    },
+    "devDependencies": {
+        "@citizenfx/client": "^2.0.19413-1",
+        "@citizenfx/server": "^2.0.19413-1",
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
