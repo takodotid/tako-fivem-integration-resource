@@ -88,14 +88,13 @@ class Tako {
 
                 url.searchParams.append("token", token);
 
-                const hooks = global.exports?.tako?.preAccountBindHooks;
+                const check = this.#getHook("preAccountBindHooks");
 
-                if (hooks && typeof hooks === "function") {
-                    const result = await hooks(playerSrc);
+                if (check) {
+                    const result = await check(playerSrc);
 
                     if (result !== true) {
                         this.#sendChatMessage(playerSrc, result);
-
                         return;
                     }
                 }
@@ -180,6 +179,26 @@ class Tako {
     }
 
     /**
+     * Get and execute a hook if exists
+     * @template {keyof CitizenExports['tako']} T enum of hook names
+     * @param {T} name Hook name
+     * @returns {CitizenExports['tako'][T] | undefined} The hook function if it exists
+     */
+    #getHook(name) {
+        try {
+            /** @type {CitizenExports['tako'][T]} */
+            // @ts-ignore
+            const hook = global.exports.tako[name];
+
+            if (hook && typeof hook === "function") {
+                return hook;
+            }
+        } catch (error) {
+            // Ignore
+        }
+    }
+
+    /**
      * Send a chat message to a player
      * @param {string} playerSrc Player source to send message to
      * @param {string} message Message to send
@@ -201,8 +220,9 @@ class Tako {
             const licensesList = [];
 
             for (const playerSrc of getPlayers()) {
-                const hooks = global.exports?.tako?.prePlayerPingHooks;
-                if (hooks && typeof hooks === "function" && !(await hooks(playerSrc))) continue;
+                const check = this.#getHook("prePlayerPingHooks");
+                if (check && !(await check(playerSrc))) continue;
+
                 licensesList.push(...this.#getPlayerLicenses(playerSrc));
             }
 
@@ -211,9 +231,9 @@ class Tako {
                 return;
             }
 
-            const hooks = global.exports?.tako?.prePingHooks;
+            const check = this.#getHook("prePingHooks");
 
-            if (hooks && typeof hooks === "function" && !(await hooks())) {
+            if (check && !(await check())) {
                 this.#logger.info("Ping aborted due to prePingHooks.");
                 return;
             }
