@@ -26,11 +26,12 @@
 
 // @ts-check
 "use strict";
+require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "polyfills.js"));
 
 /**
  * Hooks that will determine whether the user
  * can bind their Tako account or not.
- * @type {((playerSrc: string) => Promise<true | string>)[]}
+ * @type {(import("./types").PreAccountBindHook)[]}
  */
 const PRE_ACCOUNT_BIND_HOOKS = [
     /**
@@ -48,7 +49,6 @@ const PRE_ACCOUNT_BIND_HOOKS = [
             return "Failed to get your FiveM license identifier. Please try again.";
         }
 
-        const fetch = globalThis.exports.tako.fetch;
         const res = await fetch(`https://lambda.fivem.net/api/ticket/playtimes/${CFX_RE_SERVER_ID}?identifiers[]=${PLAYER_FIVEM_LICENSE}`);
 
         if (!res.ok) {
@@ -78,7 +78,7 @@ const PRE_ACCOUNT_BIND_HOOKS = [
 /**
  * Hooks that will be executed before server determines
  * whether to include the player in the ping sequence.
- * @type {((playerSrc: string) => Promise<boolean>)[]}
+ * @type {(import("./types").PrePlayerPingHook)[]}
  */
 const PRE_PLAYER_PING_HOOKS = [
     /**
@@ -97,7 +97,7 @@ const PRE_PLAYER_PING_HOOKS = [
 /**
  * Hooks that will be executed before server determines
  * whether to continue ping to the Tako server or not.
- * @type {(() => Promise<boolean>)[]}
+ * @type {(import("./types").PrePingHook)[]}
  */
 const PRE_PING_HOOKS = [
     /**
@@ -118,29 +118,8 @@ const PRE_PING_HOOKS = [
     },
 ];
 
-globalThis.exports("preAccountBindHooks", async (/** @type {string} */ playerSrc) => {
-    for (const hook of PRE_ACCOUNT_BIND_HOOKS) {
-        const result = await hook(playerSrc);
-        if (result !== true) return result;
-    }
-
-    return true;
-});
-
-globalThis.exports("prePlayerPingHooks", async (/** @type {string} */ playerSrc) => {
-    for (const hook of PRE_PLAYER_PING_HOOKS) {
-        const result = await hook(playerSrc);
-        if (result === false) return false;
-    }
-
-    return true;
-});
-
-globalThis.exports("prePingHooks", async () => {
-    for (const hook of PRE_PING_HOOKS) {
-        const result = await hook();
-        if (result === false) return false;
-    }
-
-    return true;
-});
+module.exports = {
+    PRE_ACCOUNT_BIND_HOOKS,
+    PRE_PLAYER_PING_HOOKS,
+    PRE_PING_HOOKS,
+};

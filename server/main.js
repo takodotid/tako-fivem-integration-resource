@@ -20,10 +20,7 @@
 
 // @ts-check
 "use strict";
-
-const http = require("http");
-const https = require("https");
-const { URL } = require("url");
+require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "polyfills.js"));
 
 class Tako {
     convarName = "tako_server_id";
@@ -101,7 +98,7 @@ class Tako {
 
                 url.searchParams.append("token", token);
 
-                const check = this.#getHook("preAccountBindHooks");
+                const check = this.#hooks.preAccountBindHooks;
 
                 if (check) {
                     const result = await check(playerSrc);
@@ -157,6 +154,83 @@ class Tako {
     ];
 
     /**
+     * Get registered hook (if any)
+     */
+    get #hooks() {
+        try {
+            const hooks = require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "hooks.js"));
+
+            return {
+                /** @type {import("./types").PreAccountBindHook} */
+                preAccountBindHooks: async (playerSrc) => {
+                    if (!hooks.PRE_ACCOUNT_BIND_HOOKS || !Array.isArray(hooks.PRE_ACCOUNT_BIND_HOOKS)) {
+                        this.#logger.warn("PRE_ACCOUNT_BIND_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_ACCOUNT_BIND_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_ACCOUNT_BIND_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook(playerSrc);
+                        if (result !== true) return result;
+                    }
+
+                    return true;
+                },
+
+                /** @type {import("./types").PrePlayerPingHook} */
+                prePlayerPingHooks: async (/** @type {string} */ playerSrc) => {
+                    if (!hooks.PRE_PLAYER_PING_HOOKS || !Array.isArray(hooks.PRE_PLAYER_PING_HOOKS)) {
+                        this.#logger.warn("PRE_PLAYER_PING_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_PLAYER_PING_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_PLAYER_PING_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook(playerSrc);
+                        if (result === false) return false;
+                    }
+
+                    return true;
+                },
+
+                /** @type {import("./types").PrePingHook} */
+                prePingHooks: async () => {
+                    if (!hooks.PRE_PING_HOOKS || !Array.isArray(hooks.PRE_PING_HOOKS)) {
+                        this.#logger.warn("PRE_PING_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_PING_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_PING_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook();
+                        if (result === false) return false;
+                    }
+
+                    return true;
+                },
+            };
+        } catch (error) {
+            return {
+                preAccountBindHooks: null,
+                prePlayerPingHooks: null,
+                prePingHooks: null,
+            };
+        }
+    }
+
+    /**
      * Ping interval every 30 minutes
      * @type {NodeJS.Timeout | undefined}
      */
@@ -182,26 +256,6 @@ class Tako {
     }
 
     /**
-     * Get and execute a hook if exists
-     * @template {keyof CitizenExports['tako']} T enum of hook names
-     * @param {T} name Hook name
-     * @returns {CitizenExports['tako'][T] | undefined} The hook function if it exists
-     */
-    #getHook(name) {
-        try {
-            /** @type {CitizenExports['tako'][T]} */
-            // @ts-ignore
-            const hook = global.exports.tako[name];
-
-            if (hook && typeof hook === "function") {
-                return hook;
-            }
-        } catch (error) {
-            // Ignore
-        }
-    }
-
-    /**
      * Send a chat message to a player
      * @param {string} playerSrc Player source to send message to
      * @param {string} message Message to send
@@ -223,9 +277,7 @@ class Tako {
             const licensesList = [];
 
             for (const playerSrc of getPlayers()) {
-                const check = this.#getHook("prePlayerPingHooks");
-                if (check && !(await check(playerSrc))) continue;
-
+                if (this.#hooks.prePlayerPingHooks && !(await this.#hooks.prePlayerPingHooks(playerSrc))) continue;
                 licensesList.push(...this.#getPlayerLicenses(playerSrc));
             }
 
@@ -234,9 +286,7 @@ class Tako {
                 return;
             }
 
-            const check = this.#getHook("prePingHooks");
-
-            if (check && !(await check())) {
+            if (this.#hooks.prePingHooks && !(await this.#hooks.prePingHooks())) {
                 this.#logger.info("Ping aborted due to prePingHooks.");
                 return;
             }
