@@ -27,11 +27,8 @@ const { URL } = require("url");
 
 class Tako {
     convarName = "tako_server_id";
+    serverId = GetConvar(this.convarName, "");
     resourceName = "tako"; // DO NOT CHANGE, ANY CHANGE WILL BREAK THE RESOURCE
-
-    get serverId() {
-        return GetConvar(this.convarName, "__default__");
-    }
 
     get #baseUrl() {
         // For local development/testing purposes
@@ -42,8 +39,24 @@ class Tako {
         return new URL(`https://tako.id/api/fivem-server/${this.serverId}/`);
     }
 
+    get #logger() {
+        const date = `\x1b[2m[${new Date().toLocaleString("id-ID")}]\x1b[0m`;
+
+        // [NOTE]
+        // Prevent using console.info, console.warn, console.error directly
+        // This will also prevent default log prefix by the server (Error:, Warning:, etc)
+        return {
+            /** @type {typeof console.log} */
+            info: (...args) => console.log(date, "\x1b[32mINFO\x1b[0m", ...args),
+            /** @type {typeof console.warn} */
+            warn: (...args) => console.log(date, "\x1b[33mWARN\x1b[0m", ...args),
+            /** @type {typeof console.error} */
+            error: (...args) => console.log(date, "\x1b[31mERROR\x1b[0m", ...args),
+        };
+    }
+
     constructor() {
-        if (this.serverId === "__default__") {
+        if (!this.serverId) {
             this.#logger.error(`'${this.convarName}' convar is not set. Please set it in your server configuration (server.cfg).`);
             StopResource(GetCurrentResourceName());
             return;
@@ -144,20 +157,10 @@ class Tako {
     ];
 
     /**
-     * Logger utility
-     * @type {Record<"info" | "warn" | "error", (msg: string, ...args: any[]) => void>}
-     */
-    #logger = {
-        info: (msg, ...args) => console.log(`[TAKO] ${msg}`, ...args),
-        warn: (msg, ...args) => console.warn(`[TAKO] ${msg}`, ...args),
-        error: (msg, ...args) => console.error(`[TAKO] ${msg}`, ...args),
-    };
-
-    /**
      * Ping interval every 30 minutes
      * @type {NodeJS.Timeout | undefined}
      */
-    #pingInterval = setInterval(() => this.ping, 1000 * 60 * 30);
+    #pingInterval = setInterval(this.ping.bind(this), 30 * 60 * 1000);
 
     /**
      * Get valid player licenses
@@ -251,7 +254,7 @@ class Tako {
             const result = await res.text();
 
             if (!res.ok) {
-                console.error("Failed to ping server:", result);
+                this.#logger.error("Failed to ping server:", result);
                 return;
             }
 
@@ -299,9 +302,6 @@ class Tako {
      * Register command description for chat suggestions
      */
     async registerCommandDescription() {
-        // Remove convar-based command if exists
-        emitNet("chat:removeSuggestion", globalThis.source, `/${this.convarName}`);
-
         // Register description for the main command
         emitNet("chat:addSuggestion", globalThis.source, `/${this.resourceName}`, "Integrate your account with Tako! Register now at https://tako.id", [
             {
