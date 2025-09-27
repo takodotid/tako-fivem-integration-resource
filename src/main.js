@@ -120,6 +120,11 @@ class Tako {
                         method: "POST",
                     });
 
+                    if (res.status === 401) {
+                        this.#sendChatMessage(playerSrc, "This server is not registered with Tako. Please contact the server administrator.");
+                        return;
+                    }
+
                     this.#sendChatMessage(playerSrc, await res.text());
                 } catch (error) {
                     this.#logger.error("Error connecting to server:", error);
@@ -149,6 +154,11 @@ class Tako {
                     const res = await fetch(url, {
                         method: "GET",
                     });
+
+                    if (res.status === 401) {
+                        this.#sendChatMessage(playerSrc, "This server is not registered with Tako. Please contact the server administrator.");
+                        return;
+                    }
 
                     this.#sendChatMessage(playerSrc, await res.text());
                 } catch (error) {
