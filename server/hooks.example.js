@@ -58,7 +58,7 @@ const PRE_ACCOUNT_BIND_HOOKS = [
 
         const data = await res.json();
 
-        if (typeof data !== "object" || !Array.isArray(data.playtimes) || !data[0] || typeof data[0].seconds !== "number") {
+        if (typeof data !== "object" || !Array.isArray(data) || !data[0] || typeof data[0].seconds !== "number") {
             console.error("[TAKO] Invalid response format:", data);
             return "Failed to verify your playtime. Please try again later.";
         }
