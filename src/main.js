@@ -22,20 +22,124 @@
 "use strict";
 require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "polyfills.js"));
 
-class Tako {
-    convarName = "tako_server_id";
-    serverId = GetConvar(this.convarName, "");
-    resourceName = "tako"; // DO NOT CHANGE, ANY CHANGE WILL BREAK THE RESOURCE
+const SERVER_ID_CONVAR = "tako_server_id";
+const SERVER_ID = GetConvar(SERVER_ID_CONVAR, "");
+const COMMAND_NAME = "tako";
 
-    get #baseUrl() {
-        // For local development/testing purposes
-        if (this.serverId === "tako") {
-            return new URL("http://localhost:3000/api/fivem-server/tako/");
+const BASE_PING_INTERVAL = 30 * 60 * 1000; // Base duration to wait before next ping (30 minutes)
+const SUCCESSFUL_NEXT_PING_DELAY = 5 * 1000; // Duration to wait before next ping after a successful ping (5 seconds)
+const CONSECUTIVE_PING_FAILURE_THRESHOLD = 3; // Number of consecutive ping failures before applying longer retry timeout
+const FAILED_PING_RETRY_TIMEOUT = 5 * 60 * 1000; // Duration to wait before retrying a failed ping (5 minutes)
+const CONSECUTIVE_PING_FAILURE_RETRY_TIMEOUT = BASE_PING_INTERVAL; // Duration to wait before retrying after too many consecutive ping failures (30 minutes)
+
+class Tako {
+    constructor() {
+        if (!SERVER_ID) {
+            this.#logger.error(`Convar "${SERVER_ID_CONVAR}" is not set. Please set it to your server ID from Tako. After setting it, restart the resource.`);
+            return;
         }
 
-        return new URL(`https://tako.id/api/fivem-server/${this.serverId}/`);
+        this.#logger.info(`Resource started, configured server ID: "${SERVER_ID}", initiating ping sequence...`);
+        this.ping();
+
+        RegisterCommand(COMMAND_NAME, this.handleCommand.bind(this), false);
+
+        on("playerJoining", this.registerCommandDescription.bind(this));
+        on("onResourceStop", this.#onResourceStop.bind(this));
     }
 
+    /**
+     * Base URL for the API
+     */
+    get #baseUrl() {
+        // For local development/testing purposes
+        if (SERVER_ID === "tako") {
+            return new URL(`http://localhost:3000/api/fivem-server/${SERVER_ID}/`);
+        }
+
+        return new URL(`https://tako.id/api/fivem-server/${SERVER_ID}/`);
+    }
+
+    /**
+     * Get registered hook (if any)
+     */
+    get #hooks() {
+        try {
+            const hooks = require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "hooks.js"));
+
+            return {
+                /** @type {import("./types").PreAccountBindHook} */
+                preAccountBindHooks: async (playerSrc) => {
+                    if (!hooks.PRE_ACCOUNT_BIND_HOOKS || !Array.isArray(hooks.PRE_ACCOUNT_BIND_HOOKS)) {
+                        this.#logger.warn("PRE_ACCOUNT_BIND_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_ACCOUNT_BIND_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_ACCOUNT_BIND_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook(playerSrc);
+                        if (result !== true) return result;
+                    }
+
+                    return true;
+                },
+
+                /** @type {import("./types").PrePlayerPingHook} */
+                prePlayerPingHooks: async (/** @type {string} */ playerSrc) => {
+                    if (!hooks.PRE_PLAYER_PING_HOOKS || !Array.isArray(hooks.PRE_PLAYER_PING_HOOKS)) {
+                        this.#logger.warn("PRE_PLAYER_PING_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_PLAYER_PING_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_PLAYER_PING_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook(playerSrc);
+                        if (result === false) return false;
+                    }
+
+                    return true;
+                },
+
+                /** @type {import("./types").PrePingHook} */
+                prePingHooks: async () => {
+                    if (!hooks.PRE_PING_HOOKS || !Array.isArray(hooks.PRE_PING_HOOKS)) {
+                        this.#logger.warn("PRE_PING_HOOKS is not an array. Skipping the hook.");
+                        return true;
+                    }
+
+                    for (const hook of hooks.PRE_PING_HOOKS) {
+                        if (typeof hook !== "function") {
+                            this.#logger.warn("A hook in PRE_PING_HOOKS is not a function. Skipping the hook.");
+                            continue;
+                        }
+
+                        const result = await hook();
+                        if (result === false) return false;
+                    }
+
+                    return true;
+                },
+            };
+        } catch (error) {
+            return {
+                preAccountBindHooks: null,
+                prePlayerPingHooks: null,
+                prePingHooks: null,
+            };
+        }
+    }
+
+    /**
+     * Custom logger with timestamp and log level
+     */
     get #logger() {
         const date = `\x1b[2m[${new Date().toLocaleString("id-ID")}]\x1b[0m`;
 
@@ -50,27 +154,6 @@ class Tako {
             /** @type {typeof console.error} */
             error: (...args) => console.log(date, "\x1b[31mERROR\x1b[0m", ...args),
         };
-    }
-
-    constructor() {
-        if (!this.serverId) {
-            this.#logger.error(`'${this.convarName}' convar is not set. Please set it in your server configuration (server.cfg).`);
-            StopResource(GetCurrentResourceName());
-            return;
-        }
-
-        if (GetCurrentResourceName() !== this.resourceName) {
-            this.#logger.error(`Resource must be named '${this.resourceName}' to function properly. Please rename the resource folder.`);
-            StopResource(GetCurrentResourceName());
-            return;
-        }
-
-        this.#logger.info(`Resource started, configured server ID: "${this.serverId}", initiating ping sequence...`);
-
-        this.ping();
-        RegisterCommand(this.resourceName, this.handleCommand.bind(this), false);
-        on("playerJoining", this.registerCommandDescription.bind(this));
-        on("onResourceStop", this.#onResourceStop.bind(this));
     }
 
     /**
@@ -164,83 +247,6 @@ class Tako {
     ];
 
     /**
-     * Get registered hook (if any)
-     */
-    get #hooks() {
-        try {
-            const hooks = require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "hooks.js"));
-
-            return {
-                /** @type {import("./types").PreAccountBindHook} */
-                preAccountBindHooks: async (playerSrc) => {
-                    if (!hooks.PRE_ACCOUNT_BIND_HOOKS || !Array.isArray(hooks.PRE_ACCOUNT_BIND_HOOKS)) {
-                        this.#logger.warn("PRE_ACCOUNT_BIND_HOOKS is not an array. Skipping the hook.");
-                        return true;
-                    }
-
-                    for (const hook of hooks.PRE_ACCOUNT_BIND_HOOKS) {
-                        if (typeof hook !== "function") {
-                            this.#logger.warn("A hook in PRE_ACCOUNT_BIND_HOOKS is not a function. Skipping the hook.");
-                            continue;
-                        }
-
-                        const result = await hook(playerSrc);
-                        if (result !== true) return result;
-                    }
-
-                    return true;
-                },
-
-                /** @type {import("./types").PrePlayerPingHook} */
-                prePlayerPingHooks: async (/** @type {string} */ playerSrc) => {
-                    if (!hooks.PRE_PLAYER_PING_HOOKS || !Array.isArray(hooks.PRE_PLAYER_PING_HOOKS)) {
-                        this.#logger.warn("PRE_PLAYER_PING_HOOKS is not an array. Skipping the hook.");
-                        return true;
-                    }
-
-                    for (const hook of hooks.PRE_PLAYER_PING_HOOKS) {
-                        if (typeof hook !== "function") {
-                            this.#logger.warn("A hook in PRE_PLAYER_PING_HOOKS is not a function. Skipping the hook.");
-                            continue;
-                        }
-
-                        const result = await hook(playerSrc);
-                        if (result === false) return false;
-                    }
-
-                    return true;
-                },
-
-                /** @type {import("./types").PrePingHook} */
-                prePingHooks: async () => {
-                    if (!hooks.PRE_PING_HOOKS || !Array.isArray(hooks.PRE_PING_HOOKS)) {
-                        this.#logger.warn("PRE_PING_HOOKS is not an array. Skipping the hook.");
-                        return true;
-                    }
-
-                    for (const hook of hooks.PRE_PING_HOOKS) {
-                        if (typeof hook !== "function") {
-                            this.#logger.warn("A hook in PRE_PING_HOOKS is not a function. Skipping the hook.");
-                            continue;
-                        }
-
-                        const result = await hook();
-                        if (result === false) return false;
-                    }
-
-                    return true;
-                },
-            };
-        } catch (error) {
-            return {
-                preAccountBindHooks: null,
-                prePlayerPingHooks: null,
-                prePingHooks: null,
-            };
-        }
-    }
-
-    /**
      * Get valid player licenses
      * @param {string} playerSrc Player source
      * @returns {string[]} List of valid player licenses
@@ -301,13 +307,13 @@ class Tako {
 
             if (!licensesList.length) {
                 this.#logger.info("No players to ping, retrying in 5 minutes...");
-                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), FAILED_PING_RETRY_TIMEOUT);
                 return;
             }
 
             if (this.#hooks.prePingHooks && !(await this.#hooks.prePingHooks())) {
                 this.#logger.info("Ping aborted due to pre-ping hook, retrying in 5 minutes...");
-                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), FAILED_PING_RETRY_TIMEOUT);
                 return;
             }
 
@@ -325,7 +331,7 @@ class Tako {
 
             if (!res.ok) {
                 if (res.status === 429) {
-                    let retryAfter = 30 * 60; // Default to 30 minutes
+                    let retryAfter = BASE_PING_INTERVAL / 1000; // Default to 30 minutes
 
                     if (res.headers.get("Retry-After")) {
                         const header = (res.headers.get("Retry-After")?.split(",")[0] || "").trim();
@@ -346,7 +352,7 @@ class Tako {
                     this.#nextPingTimeout = setTimeout(this.ping.bind(this), retryAfter * 1000);
                 } else {
                     this.#logger.error("Failed to ping server, retrying in 5 minutes:", result);
-                    this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
+                    this.#nextPingTimeout = setTimeout(this.ping.bind(this), FAILED_PING_RETRY_TIMEOUT);
                 }
 
                 return;
@@ -354,19 +360,19 @@ class Tako {
 
             this.#logger.info("Successfully pinged server");
             this.#pingErrorCount = 0;
-            this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 1000); // Ping again after 5 seconds
+            this.#nextPingTimeout = setTimeout(this.ping.bind(this), SUCCESSFUL_NEXT_PING_DELAY);
             return;
         } catch (error) {
             this.#pingErrorCount++;
 
-            if (this.#pingErrorCount >= 3) {
+            if (this.#pingErrorCount >= CONSECUTIVE_PING_FAILURE_THRESHOLD) {
                 this.#logger.error(
                     "Too many consecutive ping errors. Retrying again in 30 minutes. Please check your server configuration and network connection, or contact Tako if the issue persists."
                 );
-                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 30 * 60 * 1000); // Retry ping after 30 minutes
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), CONSECUTIVE_PING_FAILURE_RETRY_TIMEOUT);
             } else {
                 this.#logger.error("Error pinging server, retrying in 5 minutes:", error);
-                this.#nextPingTimeout = setTimeout(this.ping.bind(this), 5 * 60 * 1000); // Retry ping after 5 minutes
+                this.#nextPingTimeout = setTimeout(this.ping.bind(this), FAILED_PING_RETRY_TIMEOUT);
             }
 
             return;
@@ -385,7 +391,7 @@ class Tako {
         }
 
         if (args.length < 1) {
-            this.#sendChatMessage(playerSrc.toString(), `Arguments required. Usage: /${this.resourceName} <${this.#commands.map((cmd) => cmd.name).join("|")}> [...args]`);
+            this.#sendChatMessage(playerSrc.toString(), `Arguments required. Usage: /${COMMAND_NAME} <${this.#commands.map((cmd) => cmd.name).join("|")}> [...args]`);
             return;
         }
 
@@ -399,7 +405,7 @@ class Tako {
         const commandArgs = args.slice(1);
 
         if (command.args.length !== commandArgs.length) {
-            this.#sendChatMessage(playerSrc.toString(), `Invalid arguments. Usage: /${this.resourceName} ${command.name} ${command.args.map((arg) => `<${arg.name}>`).join(" ")}`);
+            this.#sendChatMessage(playerSrc.toString(), `Invalid arguments. Usage: /${COMMAND_NAME} ${command.name} ${command.args.map((arg) => `<${arg.name}>`).join(" ")}`);
             return;
         }
 
@@ -411,7 +417,7 @@ class Tako {
      */
     async registerCommandDescription() {
         // Register description for the main command
-        emitNet("chat:addSuggestion", globalThis.source, `/${this.resourceName}`, "Integrate your account with Tako! Register now at https://tako.id", [
+        emitNet("chat:addSuggestion", globalThis.source, `/${COMMAND_NAME}`, "Integrate your account with Tako! Register now at https://tako.id", [
             {
                 name: this.#commands.map((cmd) => cmd.name).join("|"),
                 help: "Sub-command to execute",
