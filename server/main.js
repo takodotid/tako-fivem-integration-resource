@@ -205,7 +205,7 @@ class Tako {
      */
     #sendChatMessage(playerSrc, message) {
         emitNet("chat:addMessage", playerSrc, {
-            args: ["[TAKO]", message],
+            args: ["TAKO", message],
         });
     }
 
