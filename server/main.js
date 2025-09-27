@@ -74,6 +74,12 @@ class Tako {
     }
 
     /**
+     * Ping interval every 30 minutes
+     * @type {NodeJS.Timeout | undefined}
+     */
+    #pingInterval = setInterval(this.ping.bind(this), 30 * 60 * 1000);
+
+    /**
      * List of commands
      * @type {{ name: string, description: string, args: { name: string, help: string }[], handler: (playerSrc: string, ...args: any) => Promise<void> }[]}
      */
@@ -229,12 +235,6 @@ class Tako {
             };
         }
     }
-
-    /**
-     * Ping interval every 30 minutes
-     * @type {NodeJS.Timeout | undefined}
-     */
-    #pingInterval = setInterval(this.ping.bind(this), 30 * 60 * 1000);
 
     /**
      * Get valid player licenses
