@@ -5,7 +5,7 @@ This resource provides integration handler for Tako's partnered FiveM servers.
 ## Features
 
 1. **Playtime Tracking**: Automatically tracks and updates connected Tako users' playtime on the server.
-2. **Account Linking**: Allows users to link their Tako account with their FiveM server account for seamless integration with `/connect-tako <code>` command.
+2. **Account Linking**: Allows users to link their Tako account with their FiveM server account for seamless integration with `/tako connect <code>` command, or check their connection status with `/tako info`.
 
 ## Installation
 
