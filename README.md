@@ -16,7 +16,7 @@ This resource provides integration handler for Tako's partnered FiveM servers.
 2. Add `ensure tako` to your `server.cfg` file to ensure the resource starts with your server, the order does not matter.
 3. Add the following convar to your `server.cfg`, replacing `your_server_id` with the server ID provided by Tako:
     ```bash
-    set tako:server_id "your_server_id"
+    set tako_server_id "your_server_id"
     ```
 4. Start/restart your FiveM server.
 5. Verify that the resource is running by checking the server console for any errors related to the `tako` resource.
