@@ -20,7 +20,7 @@
 
 // @ts-check
 "use strict";
-require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "polyfills.js"));
+require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "polyfills.js"));
 
 class Tako {
     convarName = "tako_server_id";
@@ -164,7 +164,7 @@ class Tako {
      */
     get #hooks() {
         try {
-            const hooks = require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "hooks.js"));
+            const hooks = require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "hooks.js"));
 
             return {
                 /** @type {import("./types").PreAccountBindHook} */

@@ -26,7 +26,7 @@
 
 // @ts-check
 "use strict";
-require(require("path").join(GetResourcePath(GetCurrentResourceName()), "server", "polyfills.js"));
+require(require("path").join(GetResourcePath(GetCurrentResourceName()), "src", "polyfills.js"));
 
 /**
  * Hooks that will determine whether the user
