@@ -36,10 +36,10 @@ class Tako {
     get #baseUrl() {
         // For local development/testing purposes
         if (this.serverId === "tako") {
-            return new URL("http://localhost:3000/api/fivem-server/tako");
+            return new URL("http://localhost:3000/api/fivem-server/tako/");
         }
 
-        return new URL(`https://tako.id/api/fivem-server/${this.serverId}`);
+        return new URL(`https://tako.id/api/fivem-server/${this.serverId}/`);
     }
 
     constructor() {
@@ -80,7 +80,7 @@ class Tako {
                     return;
                 }
 
-                const url = new URL("/connect", this.#baseUrl);
+                const url = new URL("connect", this.#baseUrl);
 
                 for (const license of playerLicensesList) {
                     url.searchParams.append("license", license);
@@ -123,7 +123,7 @@ class Tako {
                     return;
                 }
 
-                const url = new URL("/connect", this.#baseUrl);
+                const url = new URL("connect", this.#baseUrl);
 
                 for (const license of playerLicensesList) {
                     url.searchParams.append("license", license);
@@ -238,7 +238,7 @@ class Tako {
                 return;
             }
 
-            const url = new URL("/ping", this.#baseUrl);
+            const url = new URL("ping", this.#baseUrl);
 
             const res = await fetch(url, {
                 method: "POST",
