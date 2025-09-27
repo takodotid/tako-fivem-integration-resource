@@ -1,3 +1,13 @@
+/*
+ * Editable License — PT Hobimu Jadi Cuan (2025)
+ *
+ * This file contains polyfills and is provided for use with Tako.
+ * It may be modified by the client who lawfully owns this file
+ * and by PT Hobimu Jadi Cuan (Tako).
+ *
+ * Any other modification, copying, or distribution is not permitted.
+ */
+
 // @ts-check
 "use strict";
 
